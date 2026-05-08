@@ -20,11 +20,8 @@
   "@context": "https://schema.org",
   "@graph": [
     {
-      "@type": "Person",
       "@id": "https://chadloder.dev/#person",
-      "name": "Chad Loder",
-      "url": "https://chadloder.dev/",
-      "jobTitle": "Security researcher & technologist",
+      "@type": "Person",
       "description": "Chad Loder — security researcher and technologist.",
       "identifier": [
         {
@@ -38,40 +35,43 @@
           "value": "chadloder.dev"
         }
       ],
+      "jobTitle": "Security researcher & technologist",
+      "name": "Chad Loder",
       "sameAs": [
         "https://bsky.app/profile/chadloder.dev",
         "https://kolektiva.social/@chadloder",
         "https://github.com/chad-loder",
         "https://www.linkedin.com/in/chadloder/",
         "https://newsletter.extremism.io"
-      ]
+      ],
+      "url": "https://chadloder.dev/"
     },
     {
-      "@type": "WebSite",
       "@id": "https://chadloder.dev/#website",
-      "url": "https://chadloder.dev/",
-      "name": "chadloder.dev",
+      "@type": "WebSite",
       "about": {
-        "@id": "https://chadloder.dev/#person"
-      },
-      "publisher": {
         "@id": "https://chadloder.dev/#person"
       },
       "alternateName": [
         "chadloder.com",
         "chadloder.org"
-      ]
+      ],
+      "name": "chadloder.dev",
+      "publisher": {
+        "@id": "https://chadloder.dev/#person"
+      },
+      "url": "https://chadloder.dev/"
     },
     {
-      "@type": "WebPage",
       "@id": "https://chadloder.dev/#webpage",
-      "url": "https://chadloder.dev/",
+      "@type": "WebPage",
+      "about": {
+        "@id": "https://chadloder.dev/#person"
+      },
       "isPartOf": {
         "@id": "https://chadloder.dev/#website"
       },
-      "about": {
-        "@id": "https://chadloder.dev/#person"
-      }
+      "url": "https://chadloder.dev/"
     }
   ]
 }

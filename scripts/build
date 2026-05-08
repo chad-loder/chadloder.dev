@@ -167,7 +167,11 @@ def build_jsonld(profile: dict, icons: list[tuple]) -> str:
         "@context": "https://schema.org",
         "@graph":   [person, website, webpage],
     }
-    return json.dumps(data, indent=2, ensure_ascii=False)
+    # sort_keys=True gives lexicographic stability across runs — same
+    # input → same bytes regardless of how the dicts were constructed.
+    # This keeps generated index.html cache-friendly: regenerating with
+    # unchanged data produces a byte-identical output.
+    return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
 
 
 def main() -> None:
