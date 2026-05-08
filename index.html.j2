@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ profile.name }}</title>
+  <meta name="description" content="{{ profile.description }}">
+
+  <link rel="canonical" href="{{ profile.url }}">
+
+  <!-- Open Graph (link previews on Slack, iMessage, Discord, Bluesky, Mastodon, LinkedIn, X) -->
+  <meta property="og:type" content="profile">
+  <meta property="og:title" content="{{ profile.name }}">
+  <meta property="og:description" content="{{ profile.job_title }}">
+  <meta property="og:url" content="{{ profile.url }}">
+  <meta property="profile:username" content="{{ profile.username }}">
+
+  <script type="application/ld+json">
+{{ jsonld | safe }}
+  </script>
+
+  <style>
+    /* Color scheme: dark by default, follow user system preference. */
+    :root {
+      color-scheme: dark light;
+      --bg: #0d1117;
+      --fg: #e6edf3;
+      --fg-dim: #8b949e;
+      --link: #58a6ff;
+      --link-hover: #79c0ff;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #ffffff;
+        --fg: #1f2328;
+        --fg-dim: #59636e;
+        --link: #0969da;
+        --link-hover: #1f6feb;
+      }
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   "Helvetica Neue", Arial, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      max-width: 480px;
+      width: 100%;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--fg-dim); margin-bottom: 1.5rem; font-size: 0.95rem; }
+
+    .links { list-style: none; }
+    .links li { margin: 0; }
+    .links a {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.625rem;
+      color: var(--link);
+      text-decoration: none;
+      font-size: 0.95rem;
+      padding: 0.5rem 0;
+      border-radius: 4px;
+    }
+    .links a:hover,
+    .links a:focus-visible {
+      color: var(--link-hover);
+      text-decoration: underline;
+    }
+    .links a:focus-visible {
+      outline: 2px solid var(--link-hover);
+      outline-offset: 2px;
+    }
+    .links svg {
+      width: 1.1em;
+      height: 1.1em;
+      flex-shrink: 0;
+      fill: currentColor;
+      color: var(--fg-dim);
+    }
+    .links a:hover svg,
+    .links a:focus-visible svg {
+      color: inherit;
+    }
+  </style>
+</head>
+<body>
+  <main class="card h-card">
+    <h1 class="p-name">{{ profile.name }}</h1>
+    <p class="subtitle p-job-title">{{ profile.job_title }}</p>
+    <!-- Icons: FontAwesome Free 6 (CC BY 4.0) — https://fontawesome.com/license/free -->
+    <ul class="links" aria-label="Profiles">
+      {%- for icon in icons %}
+      <li>
+        <a href="{{ icon.href }}" aria-label="{{ icon.platform }}: {{ icon.text }}"{% if icon.rel %} rel="{{ icon.rel }}"{% endif %}>
+          <svg viewBox="{{ icon.viewbox }}" aria-hidden="true">{{ icon.svg_inner | safe }}</svg>
+          <span>{{ icon.text }}</span>
+        </a>
+      </li>
+      {%- endfor %}
+    </ul>
+  </main>
+</body>
+</html>

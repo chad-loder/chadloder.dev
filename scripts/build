@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Render index.html.j2 → index.html via Jinja2.
+
+Edit:
+  - index.html.j2     for layout / CSS / structure (plain HTML + Jinja2 tags)
+  - PROFILE below     for the page's identity strings (name, URL, DID, …)
+  - ICONS below       to add / remove / reorder profile links
+
+Then run:
+  just build
+
+SVGs are fetched once from FontAwesome Free, cached in icons/ (committed
+to the repo for reproducible builds), and inlined into the template.
+Delete icons/ and re-run to refresh from upstream.
+"""
+from __future__ import annotations
+
+import json
+import re
+import sys
+import urllib.request
+from pathlib import Path
+
+try:
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined, select_autoescape
+except ImportError:
+    sys.exit("ERROR: jinja2 required. Install with: pip install jinja2")
+
+# ──────────────────────────────────────────────────────────────────────────
+# Identity / metadata. Drives <title>, <meta>, JSON-LD Person, h-card.
+PROFILE: dict[str, str] = {
+    "name":           "Chad Loder",
+    "job_title":      "Security researcher & technologist",
+    "description":    "Chad Loder — security researcher and technologist.",
+    "url":            "https://chadloder.dev/",
+    "username":       "chadloder",
+    "did":            "did:plc:nywb5oene54cllowkfwouxzz",
+    "atproto_handle": "chadloder.dev",
+}
+
+# Profile links. Each tuple: (slug, style, href, link text, platform name, rel)
+#   slug:     FA icon slug (e.g. 'bluesky')
+#   style:    'brands' | 'solid' | 'regular'
+#   href:     URL the link points to
+#   text:     visible text shown next to the icon
+#   platform: short platform name; combined with text into aria-label
+#   rel:      link rel attribute ('me' for identity verification, '' for none)
+ICONS: list[tuple[str, str, str, str, str, str]] = [
+    ("bluesky",   "brands", "https://bsky.app/profile/chadloder.dev",     "@chadloder.dev",                "Bluesky",    "me"),
+    ("mastodon",  "brands", "https://kolektiva.social/@chadloder",        "@chadloder@kolektiva.social",   "Fediverse",  "me"),
+    ("github",    "brands", "https://github.com/chad-loder",              "chad-loder",                    "GitHub",     "me"),
+    ("linkedin",  "brands", "https://www.linkedin.com/in/chadloder/",     "in/chadloder",                  "LinkedIn",   "me"),
+    ("newspaper", "solid",  "https://newsletter.extremism.io",            "extremism.io",                  "Newsletter", ""),
+]
+# ──────────────────────────────────────────────────────────────────────────
+
+FA_REF = "6.7.2"  # pinned FontAwesome Free release
+FA_BASE = f"https://raw.githubusercontent.com/FortAwesome/Font-Awesome/{FA_REF}/svgs"
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+ICONS_DIR = REPO_ROOT / "icons"
+TEMPLATE_PATH = REPO_ROOT / "index.html.j2"
+OUTPUT_PATH = REPO_ROOT / "index.html"
+
+
+def fetch_svg(slug: str, style: str) -> str:
+    """Return SVG text. Cache hit: read disk. Cache miss: fetch + persist."""
+    cache = ICONS_DIR / f"{style}-{slug}.svg"
+    if cache.exists():
+        return cache.read_text()
+    url = f"{FA_BASE}/{style}/{slug}.svg"
+    print(f"  fetching {style}/{slug}", file=sys.stderr)
+    with urllib.request.urlopen(url, timeout=10) as resp:
+        if resp.status != 200:
+            sys.exit(f"ERROR: GET {url} returned {resp.status}")
+        text = resp.read().decode("utf-8")
+    ICONS_DIR.mkdir(exist_ok=True)
+    cache.write_text(text)
+    return text
+
+
+def parse_svg(svg_text: str) -> tuple[str, str]:
+    """Return (viewBox value, inner SVG markup) from an SVG document."""
+    vb = re.search(r'viewBox="([^"]+)"', svg_text)
+    if not vb:
+        sys.exit("ERROR: SVG missing viewBox")
+    inner = re.search(r"<svg[^>]*>(.*?)</svg>", svg_text, re.DOTALL)
+    if not inner:
+        sys.exit("ERROR: SVG malformed (no <svg>...</svg>)")
+    return vb.group(1), inner.group(1).strip()
+
+
+def prune_cache(icons_dir: Path, expected: set[str]) -> None:
+    if not icons_dir.exists():
+        return
+    for f in icons_dir.iterdir():
+        if f.is_file() and f.suffix == ".svg" and f.name not in expected:
+            print(f"  pruning {f.name}", file=sys.stderr)
+            f.unlink()
+
+
+def build_jsonld(profile: dict, icons: list[tuple]) -> str:
+    """Schema.org Person JSON-LD as a JSON string ready for the template."""
+    same_as = [href for _, _, href, *_ in icons if href.startswith(("http://", "https://"))]
+    data = {
+        "@context": "https://schema.org",
+        "@type":    "Person",
+        "@id":      profile["url"] + "#person",
+        "name":     profile["name"],
+        "url":      profile["url"],
+        "jobTitle": profile["job_title"],
+        "description": profile["description"],
+        "identifier": [
+            {"@type": "PropertyValue", "propertyID": "did:plc",        "value": profile["did"]},
+            {"@type": "PropertyValue", "propertyID": "atproto-handle", "value": profile["atproto_handle"]},
+        ],
+        "sameAs": same_as,
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def main() -> None:
+    if not TEMPLATE_PATH.exists():
+        sys.exit(f"ERROR: {TEMPLATE_PATH} not found")
+
+    print(f"Building from {TEMPLATE_PATH.name} ({len(ICONS)} icons, FA {FA_REF})...", file=sys.stderr)
+
+    icons_data: list[dict] = []
+    for slug, style, href, text, platform, rel in ICONS:
+        svg_text = fetch_svg(slug, style)
+        viewbox, svg_inner = parse_svg(svg_text)
+        icons_data.append({
+            "slug": slug, "style": style, "href": href, "text": text,
+            "platform": platform, "rel": rel,
+            "viewbox": viewbox, "svg_inner": svg_inner,
+        })
+
+    env = Environment(
+        loader=FileSystemLoader(REPO_ROOT),
+        autoescape=select_autoescape(["html", "j2"]),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    template = env.get_template(TEMPLATE_PATH.name)
+    rendered = template.render(
+        profile=PROFILE,
+        icons=icons_data,
+        jsonld=build_jsonld(PROFILE, ICONS),
+    )
+    OUTPUT_PATH.write_text(rendered)
+    print(f"Wrote {OUTPUT_PATH.name} ({OUTPUT_PATH.stat().st_size} bytes)", file=sys.stderr)
+
+    expected = {f"{i['style']}-{i['slug']}.svg" for i in icons_data}
+    prune_cache(ICONS_DIR, expected)
+
+
+if __name__ == "__main__":
+    main()
