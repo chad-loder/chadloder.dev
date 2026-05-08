@@ -27,15 +27,29 @@ except ImportError:
     sys.exit("ERROR: jinja2 required. Install with: pip install jinja2")
 
 # ──────────────────────────────────────────────────────────────────────────
-# Identity / metadata. Drives <title>, <meta>, JSON-LD Person, h-card.
-PROFILE: dict[str, str] = {
+# Single source of truth for the primary domain. The Bluesky handle and
+# canonical URL are both derived from this — change here and everything
+# else flows through.
+DOMAIN = "chadloder.dev"
+
+# Other domains owned by the same identity. Configured to 301-redirect to
+# DOMAIN at the registrar (Gandi web forwarding). Surfaced in the JSON-LD
+# WebSite block as `alternateName` so search engines and LLM crawlers
+# treat them as aliases of the primary site.
+ALIAS_DOMAINS = ["chadloder.com", "chadloder.org"]
+
+# Identity / metadata. Drives <title>, <meta>, JSON-LD, h-card.
+PROFILE: dict = {
     "name":           "Chad Loder",
     "job_title":      "Security researcher & technologist",
     "description":    "Chad Loder — security researcher and technologist.",
-    "url":            "https://chadloder.dev/",
     "username":       "chadloder",
     "did":            "did:plc:nywb5oene54cllowkfwouxzz",
-    "atproto_handle": "chadloder.dev",
+    # Derived — DOMAIN is the source of truth.
+    "domain":         DOMAIN,
+    "url":            f"https://{DOMAIN}/",
+    "atproto_handle": DOMAIN,
+    "alias_domains":  ALIAS_DOMAINS,
 }
 
 # Profile links. Each tuple: (slug, style, href, link text, platform name, rel)
@@ -100,21 +114,58 @@ def prune_cache(icons_dir: Path, expected: set[str]) -> None:
 
 
 def build_jsonld(profile: dict, icons: list[tuple]) -> str:
-    """Schema.org Person JSON-LD as a JSON string ready for the template."""
-    same_as = [href for _, _, href, *_ in icons if href.startswith(("http://", "https://"))]
-    data = {
-        "@context": "https://schema.org",
-        "@type":    "Person",
-        "@id":      profile["url"] + "#person",
-        "name":     profile["name"],
-        "url":      profile["url"],
-        "jobTitle": profile["job_title"],
+    """Schema.org JSON-LD as a JSON string ready for the template.
+
+    Emits a @graph of three linked nodes (Person, WebSite, WebPage) so
+    search engines and LLM crawlers can stitch the entity together by
+    @id reference. sameAs is reserved for *external* reference profiles;
+    own-domain aliases (.com/.org redirects to .dev) live on
+    WebSite.alternateName per Google's site-names guidance.
+    """
+    same_as = [
+        href for _, _, href, *_ in icons
+        if href.startswith(("http://", "https://"))
+    ]
+    person_id = profile["url"] + "#person"
+    website_id = profile["url"] + "#website"
+    webpage_id = profile["url"] + "#webpage"
+
+    person = {
+        "@type":       "Person",
+        "@id":         person_id,
+        "name":        profile["name"],
+        "url":         profile["url"],
+        "jobTitle":    profile["job_title"],
         "description": profile["description"],
         "identifier": [
             {"@type": "PropertyValue", "propertyID": "did:plc",        "value": profile["did"]},
             {"@type": "PropertyValue", "propertyID": "atproto-handle", "value": profile["atproto_handle"]},
         ],
         "sameAs": same_as,
+    }
+
+    website: dict = {
+        "@type":     "WebSite",
+        "@id":       website_id,
+        "url":       profile["url"],
+        "name":      profile["domain"],
+        "about":     {"@id": person_id},
+        "publisher": {"@id": person_id},
+    }
+    if profile.get("alias_domains"):
+        website["alternateName"] = profile["alias_domains"]
+
+    webpage = {
+        "@type":    "WebPage",
+        "@id":      webpage_id,
+        "url":      profile["url"],
+        "isPartOf": {"@id": website_id},
+        "about":    {"@id": person_id},
+    }
+
+    data = {
+        "@context": "https://schema.org",
+        "@graph":   [person, website, webpage],
     }
     return json.dumps(data, indent=2, ensure_ascii=False)
 
