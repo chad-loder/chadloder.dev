@@ -60,10 +60,10 @@ PROFILE: dict = {
 #   platform: short platform name; combined with text into aria-label
 #   rel:      link rel attribute ('me' for identity verification, '' for none)
 ICONS: list[tuple[str, str, str, str, str, str]] = [
-    ("bluesky",   "brands", "https://bsky.app/profile/chadloder.dev",     "@chadloder.dev",                "Bluesky",    "me"),
-    ("mastodon",  "brands", "https://kolektiva.social/@chadloder",        "@chadloder@kolektiva.social",   "Fediverse",  "me"),
     ("github",    "brands", "https://github.com/chad-loder",              "chad-loder",                    "GitHub",     "me"),
     ("linkedin",  "brands", "https://www.linkedin.com/in/chadloder/",     "in/chadloder",                  "LinkedIn",   "me"),
+    ("bluesky",   "brands", "https://bsky.app/profile/chadloder.dev",     "@chadloder.dev",                "Bluesky",    "me"),
+    ("mastodon",  "brands", "https://kolektiva.social/@chadloder",        "@chadloder@kolektiva.social",   "Fediverse",  "me"),
     ("newspaper", "solid",  "https://newsletter.extremism.io",            "extremism.io",                  "Newsletter", ""),
 ]
 # ──────────────────────────────────────────────────────────────────────────
