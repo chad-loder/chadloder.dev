@@ -1,0 +1,23 @@
+{
+  "aliases": [
+    "https://kolektiva.social/@chadloder",
+    "https://kolektiva.social/users/chadloder"
+  ],
+  "links": [
+    {
+      "href": "https://kolektiva.social/@chadloder",
+      "rel": "http://webfinger.net/rel/profile-page",
+      "type": "text/html"
+    },
+    {
+      "href": "https://kolektiva.social/users/chadloder",
+      "rel": "self",
+      "type": "application/activity+json"
+    },
+    {
+      "rel": "http://ostatus.org/schema/1.0/subscribe",
+      "template": "https://kolektiva.social/authorize_interaction?uri={uri}"
+    }
+  ],
+  "subject": "acct:chadloder@chadloder.dev"
+}

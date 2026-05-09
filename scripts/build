@@ -38,13 +38,21 @@ DOMAIN = "chadloder.dev"
 # treat them as aliases of the primary site.
 ALIAS_DOMAINS = ["chadloder.com", "chadloder.org"]
 
-# Identity / metadata. Drives <title>, <meta>, JSON-LD, h-card.
+# Identity / metadata. Drives <title>, <meta>, JSON-LD, h-card,
+# .well-known/webfinger (Mastodon), .well-known/host-meta (legacy XRD),
+# .well-known/atproto-did (Bluesky HTTPS fallback).
 PROFILE: dict = {
     "name":           "Chad Loder",
     "job_title":      "Security researcher & technologist",
     "description":    "Chad Loder — security researcher and technologist.",
     "username":       "chadloder",
     "did":            "did:plc:nywb5oene54cllowkfwouxzz",
+    # Mastodon home instance. WebFinger here aliases
+    # acct:<username>@<DOMAIN> to the canonical kolektiva account so
+    # @chadloder@chadloder.dev resolves the same as @chadloder@kolektiva.social.
+    "mastodon_instance": "kolektiva.social",
+    "mastodon_profile":  "https://kolektiva.social/@chadloder",
+    "mastodon_actor":    "https://kolektiva.social/users/chadloder",
     # Derived — DOMAIN is the source of truth.
     "domain":         DOMAIN,
     "url":            f"https://{DOMAIN}/",
@@ -75,6 +83,10 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ICONS_DIR = REPO_ROOT / "icons"
 TEMPLATE_PATH = REPO_ROOT / "index.html.j2"
 OUTPUT_PATH = REPO_ROOT / "index.html"
+WELL_KNOWN_DIR = REPO_ROOT / ".well-known"
+WEBFINGER_PATH = WELL_KNOWN_DIR / "webfinger"
+HOST_META_PATH = WELL_KNOWN_DIR / "host-meta"
+ATPROTO_DID_PATH = WELL_KNOWN_DIR / "atproto-did"
 
 
 def fetch_svg(slug: str, style: str) -> str:
@@ -174,6 +186,63 @@ def build_jsonld(profile: dict, icons: list[tuple]) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
 
 
+def build_webfinger(profile: dict) -> str:
+    """Mastodon-compatible WebFinger JRD.
+
+    Aliases acct:<username>@<DOMAIN> to the canonical Mastodon profile
+    so fediverse clients searching for @chadloder@chadloder.dev resolve
+    to the same account as @chadloder@kolektiva.social. The kolektiva
+    account stays canonical; this is just a discoverable alias.
+
+    Note on GitHub Pages: this file is served as
+    application/octet-stream (no extension; Pages can't set custom
+    Content-Type). Most Mastodon implementations parse it anyway —
+    the spec asks for application/jrd+json but the strict requirement
+    has been an open issue (mastodon/mastodon#11191) for years.
+    """
+    subject = f"acct:{profile['username']}@{profile['domain']}"
+    instance = profile["mastodon_instance"]
+    data = {
+        "subject": subject,
+        "aliases": [
+            profile["mastodon_profile"],
+            profile["mastodon_actor"],
+        ],
+        "links": [
+            {
+                "rel":  "http://webfinger.net/rel/profile-page",
+                "type": "text/html",
+                "href": profile["mastodon_profile"],
+            },
+            {
+                "rel":  "self",
+                "type": "application/activity+json",
+                "href": profile["mastodon_actor"],
+            },
+            {
+                "rel":      "http://ostatus.org/schema/1.0/subscribe",
+                "template": f"https://{instance}/authorize_interaction?uri={{uri}}",
+            },
+        ],
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
+
+
+def build_host_meta(profile: dict) -> str:
+    """Legacy XRD pointing at the WebFinger endpoint.
+
+    Modern Mastodon queries /.well-known/webfinger directly without
+    consulting host-meta, but older / non-Mastodon clients still
+    discover the endpoint this way. Cheap to include.
+    """
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<XRD xmlns="http://docs.oasis-open.org/ns/xri/xrd-1.0">\n'
+        f'  <Link rel="lrdd" template="https://{profile["domain"]}/.well-known/webfinger?resource={{uri}}"/>\n'
+        '</XRD>\n'
+    )
+
+
 def main() -> None:
     if not TEMPLATE_PATH.exists():
         sys.exit(f"ERROR: {TEMPLATE_PATH} not found")
@@ -204,6 +273,13 @@ def main() -> None:
     )
     OUTPUT_PATH.write_text(rendered)
     print(f"Wrote {OUTPUT_PATH.name} ({OUTPUT_PATH.stat().st_size} bytes)", file=sys.stderr)
+
+    WELL_KNOWN_DIR.mkdir(exist_ok=True)
+    WEBFINGER_PATH.write_text(build_webfinger(PROFILE))
+    HOST_META_PATH.write_text(build_host_meta(PROFILE))
+    ATPROTO_DID_PATH.write_text(PROFILE["did"] + "\n")
+    for p in (WEBFINGER_PATH, HOST_META_PATH, ATPROTO_DID_PATH):
+        print(f"Wrote {p.relative_to(REPO_ROOT)} ({p.stat().st_size} bytes)", file=sys.stderr)
 
     expected = {f"{i['style']}-{i['slug']}.svg" for i in icons_data}
     prune_cache(ICONS_DIR, expected)
