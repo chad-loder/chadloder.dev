@@ -19,5 +19,5 @@
       "template": "https://kolektiva.social/authorize_interaction?uri={uri}"
     }
   ],
-  "subject": "acct:chadloder@chadloder.dev"
+  "subject": "acct:chadloder@kolektiva.social"
 }

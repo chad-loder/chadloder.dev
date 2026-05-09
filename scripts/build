@@ -187,23 +187,32 @@ def build_jsonld(profile: dict, icons: list[tuple]) -> str:
 
 
 def build_webfinger(profile: dict) -> str:
-    """Mastodon-compatible WebFinger JRD.
+    """Mastodon-compatible WebFinger JRD using the redirect pattern.
 
-    Aliases acct:<username>@<DOMAIN> to the canonical Mastodon profile
-    so fediverse clients searching for @chadloder@chadloder.dev resolve
-    to the same account as @chadloder@kolektiva.social. The kolektiva
-    account stays canonical; this is just a discoverable alias.
+    Aliases @<username>@<DOMAIN> to the canonical Mastodon account
+    (@<username>@<mastodon_instance>) so fediverse clients searching
+    for @chadloder@chadloder.dev resolve to the same account as
+    @chadloder@kolektiva.social. The kolektiva account stays canonical;
+    this is a discoverable alias.
+
+    Subject is the CANONICAL handle, not the vanity. This triggers the
+    "WebFinger redirect" code path in Mastodon's ResolveAccountService:
+    Mastodon sees the subject points to a different domain than the
+    one queried, then re-queries that domain to confirm. As long as
+    the canonical instance returns a matching subject (which it always
+    does for its own users), the alias resolves successfully — no
+    server-side WEB_DOMAIN config required on the canonical instance.
 
     Note on GitHub Pages: this file is served as
     application/octet-stream (no extension; Pages can't set custom
-    Content-Type). Most Mastodon implementations parse it anyway —
-    the spec asks for application/jrd+json but the strict requirement
-    has been an open issue (mastodon/mastodon#11191) for years.
+    Content-Type). Mastodon's Webfinger class doesn't validate
+    Content-Type — it just JSON.parses the body — so this works in
+    practice despite mastodon/mastodon#11191 calling for relaxation.
     """
-    subject = f"acct:{profile['username']}@{profile['domain']}"
+    canonical_user = f"{profile['username']}@{profile['mastodon_instance']}"
     instance = profile["mastodon_instance"]
     data = {
-        "subject": subject,
+        "subject": f"acct:{canonical_user}",
         "aliases": [
             profile["mastodon_profile"],
             profile["mastodon_actor"],
